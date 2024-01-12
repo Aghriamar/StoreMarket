@@ -113,7 +113,7 @@ namespace StoreMarket.Controllers
         }
 
         [HttpPut("setProductPrice")]
-        public ActionResult setProductPrice(int productId, [FromQuery] int newPrice)
+        public ActionResult SetProductPrice(int productId, [FromQuery] int newPrice)
         {
             try
             {
