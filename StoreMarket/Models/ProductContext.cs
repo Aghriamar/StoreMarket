@@ -1,4 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.Options;
 
 namespace StoreMarket.Models
 {
@@ -10,7 +12,8 @@ namespace StoreMarket.Models
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            optionsBuilder.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=aspnet-53bc9b9d-9d6a-45d4-8429-2a2761773502;Trusted_Connection=True;MultipleActiveResultSets=true").UseLazyLoadingProxies();
+            var configuration = this.GetService<IConfiguration>();
+            optionsBuilder.UseSqlServer(configuration.GetConnectionString("DB")).UseLazyLoadingProxies();
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -22,7 +25,7 @@ namespace StoreMarket.Models
                 entity.HasKey(x => x.Id).HasName("ProductID");
                 entity.HasIndex(x => x.Name).IsUnique();
                 entity.Property(e => e.Name).HasColumnName("ProductName").HasMaxLength(255).IsRequired();
-                entity.Property(e => e.Descriptions).HasColumnName("Description").HasMaxLength(255).IsRequired();
+                entity.Property(e => e.Description).HasColumnName("Description").HasMaxLength(255).IsRequired();
                 entity.Property(e => e.Price).HasColumnName("Price").IsRequired();
                 entity.HasOne(x => x.Category).WithMany(c => c.Products).HasForeignKey(x => x.Id).HasConstraintName("GroupToProduct");
             });

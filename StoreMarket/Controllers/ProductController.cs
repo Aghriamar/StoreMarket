@@ -1,5 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using CsvHelper;
+using CsvHelper.Configuration;
+using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
+using StoreMarket.Abstraction;
 using StoreMarket.Models;
+using StoreMarket.Models.DTO;
+using System.Globalization;
+using System.Text;
 
 namespace StoreMarket.Controllers
 {
@@ -7,8 +14,43 @@ namespace StoreMarket.Controllers
     [Route("[controller]")]
     public class ProductController : ControllerBase
     {
+        private readonly IProductRepository _productRepository;
+
+        public ProductController(IProductRepository productRepository)
+        {
+            _productRepository = productRepository;
+        }
+
         [HttpGet("getProducts")]
-        public ActionResult GetProducts()
+        public IActionResult GetProducts()
+        {
+            var products = _productRepository.GetProducts();
+            return Ok(products);
+        }
+
+        [HttpGet("getCategories")]
+        public IActionResult GetCategories()
+        {
+            var categories = _productRepository.GetCategories();
+            return Ok(categories);
+        }
+
+        [HttpPost("putProducts")]
+        public IActionResult PutProducts([FromBody] ProductDTO productDTO)
+        {
+            var result = _productRepository.AddProduct(productDTO);
+            return Ok(result);
+        }
+
+        [HttpPost("addCategory")]
+        public IActionResult AddCategory([FromBody] CategoryDTO categoryDTO)
+        {
+            var result = _productRepository.AddCategory(categoryDTO);
+            return Ok(result);
+        }
+
+        [HttpGet("exportProductsCsv")]
+        public IActionResult ExportProductsCsv()
         {
             try
             {
@@ -18,9 +60,15 @@ namespace StoreMarket.Controllers
                     {
                         Id = x.Id,
                         Name = x.Name,
-                        Description = x.Description
-                    });
-                    return Ok(products);
+                        Description = x.Description,
+                    }).ToList();
+                    var memoryStream = new MemoryStream();
+                    var streamWriter = new StreamWriter(memoryStream, Encoding.UTF8);
+                    var csvWriter = new CsvWriter(streamWriter, CultureInfo.InvariantCulture);
+                    csvWriter.WriteRecords(products);
+                    streamWriter.Flush();
+                    memoryStream.Position = 0;
+                    return File(memoryStream, "text/csv", "product.csv");
                 }
             }
             catch
@@ -29,29 +77,26 @@ namespace StoreMarket.Controllers
             }
         }
 
-        [HttpPost("putProducts")]
-        public ActionResult PutProducts([FromQuery] string name, string description, int categoryId, int price)
+        [HttpGet("cacheStatistics")]
+        public IActionResult CacheStatistics()
         {
             try
             {
-                using (var context = new ProductContext())
+                var statistics = _productRepository.GetCacheStatistics();
+
+                if (statistics != null)
                 {
-                    if(!context.Products.Any(x => x.Name.ToLower().Equals(name)))
-                    {
-                        context.Add(new Product()
-                        {
-                            Name = name,
-                            Description = description,
-                            Price = price,
-                            CategoryId = categoryId
-                        });
-                        context.SaveChanges();
-                        return Ok();
-                    }
-                    else
-                    {
-                        return StatusCode(409);
-                    }
+                    var staticFilesPath = Path.Combine(Directory.GetCurrentDirectory(), "StaticFiles");
+                    Directory.CreateDirectory(staticFilesPath);
+
+                    var filePath = Path.Combine(staticFilesPath, "CacheStatistics.txt");
+                    System.IO.File.WriteAllText(filePath, JsonConvert.SerializeObject(statistics));
+
+                    return PhysicalFile(filePath, "text/plain", "CacheStatistics.txt");
+                }
+                else
+                {
+                    return StatusCode(500);
                 }
             }
             catch
@@ -60,8 +105,9 @@ namespace StoreMarket.Controllers
             }
         }
 
+
         [HttpDelete("deleteCategory")]
-        public ActionResult DeleteProducts(int categoryId) 
+        public ActionResult DeleteProducts(int categoryId)
         {
             try
             {
